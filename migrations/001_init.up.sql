@@ -16,7 +16,7 @@ CREATE TABLE users (
 );
 
 CREATE TABLE sessions (
-    id CHAR(36) PRIMARY KEY, 
+    session_id CHAR(36) PRIMARY KEY, 
     user_id INT NOT NULL,
     expires_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
