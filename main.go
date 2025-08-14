@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -47,6 +48,19 @@ type User struct {
 	ID             int    `json:"id"`
 	Email          string `json:"email"`
 	SubscriptionID *int   `json:"subscription_id"`
+}
+
+func HashPasswordDeterministic(password, secret string) ([]byte, error) {
+	// 1. Deterministic hash (SHA256)
+	sum := sha256.Sum256([]byte(password + secret))
+
+	// 2. bcrypt hash the result
+	return bcrypt.GenerateFromPassword(sum[:], bcrypt.DefaultCost)
+}
+
+func CheckPasswordDeterministic(password, secret string, hashed []byte) error {
+	sum := sha256.Sum256([]byte(password + secret))
+	return bcrypt.CompareHashAndPassword(hashed, sum[:])
 }
 
 func (a *app) helloHandler(w http.ResponseWriter, r *http.Request) {
@@ -126,7 +140,7 @@ func (a *app) signupHandler(w http.ResponseWriter, r *http.Request) {
 		name := r.FormValue("name")
 		email := r.FormValue("email")
 		pass := r.FormValue("password")
-		hashedPass, _ := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+		hashedPass, _ := HashPasswordDeterministic(pass, "dbms")
 
 		// Store into DB
 		_, err := a.db.Exec(
@@ -156,9 +170,26 @@ func (a *app) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodPost {
+		var id int
+		var username, passwordHash string
 		email := r.FormValue("email")
 		pass := r.FormValue("password")
 		log.Printf("Login: email=%s pass=%s", email, pass)
+		err := a.db.QueryRow("SELECT id, name, password_hash FROM users WHERE email = ?", email).Scan(&id, &username, &passwordHash)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = CheckPasswordDeterministic(pass, "dbms", []byte(passwordHash))
+
+		if err != nil {
+			http.Error(w, "Error", http.StatusInternalServerError)
+			log.Printf("No user Found %v", err)
+			return
+		} else {
+			log.Printf("success")
+		}
+
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
