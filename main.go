@@ -4,19 +4,22 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"html/template"
+	"log"
+	"net/http"
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/mysql"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"log"
-	"net/http"
 	"golang.org/x/crypto/bcrypt"
-
 )
 
 type app struct {
 	db *sql.DB
 }
+
+var templates *template.Template
 
 func runMigrations(db *sql.DB) error {
 	driver, err := mysql.WithInstance(db, &mysql.Config{})
@@ -24,7 +27,7 @@ func runMigrations(db *sql.DB) error {
 		return fmt.Errorf("create migrate driver: %w", err)
 	}
 	m, err := migrate.NewWithDatabaseInstance(
-		"file://./migrations",
+		"file://migrations",
 		"mysql",
 		driver,
 	)
@@ -45,8 +48,6 @@ type User struct {
 	Email          string `json:"email"`
 	SubscriptionID *int   `json:"subscription_id"`
 }
-
-func 
 
 func (a *app) helloHandler(w http.ResponseWriter, r *http.Request) {
 	rows, err := a.db.Query("SELECT id, email, subscription_id FROM users")
@@ -88,11 +89,7 @@ func main() {
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
-	http.HandleFunc("/signup", a.signupHandler)
-	http.HandleFunc("/login", loginHandler)
-
-
-	dsn := "root:test@tcp(127.0.0.1:3306)/platform?multiStatements=true"
+	dsn := "root:@tcp(127.0.0.1:3306)/platform?multiStatements=true"
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %v", err)
@@ -106,6 +103,9 @@ func main() {
 	}
 
 	fmt.Println("Migrations applied successfully!")
+
+	http.HandleFunc("/signup", a.signupHandler)
+	http.HandleFunc("/login", a.loginHandler)
 
 	http.HandleFunc("/", a.helloHandler)
 	fmt.Println("Server listening on :8080")
@@ -128,10 +128,9 @@ func (a *app) signupHandler(w http.ResponseWriter, r *http.Request) {
 		pass := r.FormValue("password")
 		hashedPass, _ := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
 
-
 		// Store into DB
 		_, err := a.db.Exec(
-			"INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+			"INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
 			name, email, hashedPass,
 		)
 		if err != nil {
@@ -148,7 +147,7 @@ func (a *app) signupHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "signup", nil)
 }
 
-func loginHandler(w http.ResponseWriter, r *http.Request) {
+func (a *app) loginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		err := templates.ExecuteTemplate(w, "login.html", nil)
 		if err != nil {
