@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Up — MyApp</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+  <div class="max-w-4xl w-full grid md:grid-cols-2 bg-white/5 backdrop-blur-xl rounded-2xl shadow-lg border border-white/10 overflow-hidden">
+    
+    <!-- Left side -->
+    <div class="p-10 flex flex-col justify-center text-white">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-12 h-12 rounded-lg bg-gradient-to-tr from-emerald-400 to-blue-400 flex items-center justify-center font-bold text-slate-900">MA</div>
+        <div>
+          <p class="font-bold text-lg">MyApp</p>
+          <p class="text-xs text-gray-400">Smart tools for creators</p>
+        </div>
+      </div>
+      <h1 class="text-3xl font-bold mb-4">Create your account</h1>
+      <p class="text-gray-400">Join MyApp — build, share, and grow. Your account gives you access to dashboards, project settings, and API keys.</p>
+      <p class="mt-auto text-xs text-gray-500 pt-6">By signing up you agree to our 
+        <a href="#" class="text-blue-400 hover:underline">Terms</a> and 
+        <a href="#" class="text-blue-400 hover:underline">Privacy Policy</a>.
+      </p>
+    </div>
+    
+    <!-- Right side -->
+    <div class="p-8 bg-white/10 flex items-center justify-center">
+      <form method="POST" action="/signup" class="w-full max-w-sm space-y-4">
+        
+        <h2 class="text-xl font-semibold text-white">Sign up</h2>
+        <p class="text-sm text-gray-400">Already have an account? <a href="login.html" class="text-blue-400 hover:underline">Sign in</a></p>
+
+        <div>
+          <label for="name" class="block text-sm font-medium text-gray-300 mb-1">Full name</label>
+          <input type="text" id="name" name="name" required class="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400" placeholder="John Doe">
+        </div>
+
+        <div>
+          <label for="email" class="block text-sm font-medium text-gray-300 mb-1">Email</label>
+          <input type="email" id="email" name="email" required class="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400" placeholder="you@example.com">
+        </div>
+
+        <div>
+          <label for="password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+          <input type="password" id="password" name="password" required class="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400" placeholder="••••••••">
+        </div>
+
+        <div>
+          <label for="company" class="block text-sm font-medium text-gray-300 mb-1">Company (optional)</label>
+          <input type="text" id="company" name="company" class="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400" placeholder="Company name">
+        </div>
+
+        <button type="submit" class="w-full py-2 rounded-lg bg-gradient-to-r from-emerald-400 to-blue-400 font-semibold text-slate-900 hover:opacity-90 transition">Create account</button>
+        
+        <div class="flex items-center my-4">
+          <hr class="flex-grow border-gray-700">
+          <span class="mx-2 text-gray-400 text-sm">or</span>
+          <hr class="flex-grow border-gray-700">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <button type="button" class="py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10">Google</button>
+          <button type="button" class="py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10">GitHub</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

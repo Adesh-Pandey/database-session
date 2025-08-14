@@ -10,6 +10,8 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"log"
 	"net/http"
+	"golang.org/x/crypto/bcrypt"
+
 )
 
 type app struct {
@@ -43,6 +45,8 @@ type User struct {
 	Email          string `json:"email"`
 	SubscriptionID *int   `json:"subscription_id"`
 }
+
+func 
 
 func (a *app) helloHandler(w http.ResponseWriter, r *http.Request) {
 	rows, err := a.db.Query("SELECT id, email, subscription_id FROM users")
@@ -79,6 +83,15 @@ func (a *app) helloHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	templates = template.Must(template.ParseGlob("templates/*.html"))
+
+	fs := http.FileServer(http.Dir("static"))
+	http.Handle("/static/", http.StripPrefix("/static/", fs))
+
+	http.HandleFunc("/signup", a.signupHandler)
+	http.HandleFunc("/login", loginHandler)
+
+
 	dsn := "root:test@tcp(127.0.0.1:3306)/platform?multiStatements=true"
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -99,4 +112,56 @@ func main() {
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
+}
+
+func (a *app) signupHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		err := templates.ExecuteTemplate(w, "signup.html", nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	if r.Method == http.MethodPost {
+		name := r.FormValue("name")
+		email := r.FormValue("email")
+		pass := r.FormValue("password")
+		hashedPass, _ := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+
+
+		// Store into DB
+		_, err := a.db.Exec(
+			"INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+			name, email, hashedPass,
+		)
+		if err != nil {
+			http.Error(w, "Failed to save user", http.StatusInternalServerError)
+			log.Printf("DB insert error: %v", err)
+			return
+		}
+
+		log.Printf("User signed up: name=%s email=%s", name, email)
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	templates.ExecuteTemplate(w, "signup", nil)
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		err := templates.ExecuteTemplate(w, "login.html", nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	if r.Method == http.MethodPost {
+		email := r.FormValue("email")
+		pass := r.FormValue("password")
+		log.Printf("Login: email=%s pass=%s", email, pass)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	templates.ExecuteTemplate(w, "login", nil)
 }
