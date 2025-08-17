@@ -147,24 +147,24 @@ func main() {
 func (a *app) signupHandler(w http.ResponseWriter, r *http.Request) {
 	session_id, err := r.Cookie("db_session_id")
 
-	if err != nil || session_id.Value == "" {
-		http.Redirect(w, r, "/login", http.StatusFound)
-		return
-	}
-	log.Println(session_id.Value)
-	var user_id int
-	var expires_at time.Time
-	now := time.Now()
+	if err == nil && session_id.Value != "" {
+		log.Println(session_id.Value)
+		var user_id int
+		var expires_at time.Time
+		now := time.Now()
 
-	err = a.db.QueryRow("SELECT user_id,expires_at from sessions where sessions.session_id = ?", session_id.Value).Scan(&user_id, &expires_at)
-	if err != nil {
-		return
+		err = a.db.QueryRow("SELECT user_id,expires_at from sessions where sessions.session_id = ?", session_id.Value).Scan(&user_id, &expires_at)
+		if err == nil {
+
+			if expires_at.Before(now) {
+				_, err = a.db.Exec("DELETE from sessions where sessions.id=?", session_id.Value)
+			} else {
+				http.Redirect(w, r, "/", http.StatusFound)
+			}
+
+		}
 	}
-	if expires_at.Before(now) {
-		_, err = a.db.Exec("DELETE from sessions where sessions.id=?", session_id.Value)
-	} else {
-		http.Redirect(w, r, "/", http.StatusFound)
-	}
+
 	if r.Method == http.MethodGet {
 		err := templates.ExecuteTemplate(w, "signup.html", nil)
 		if err != nil {
@@ -225,23 +225,22 @@ func (a *app) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	session_id, err := r.Cookie("db_session_id")
 
-	if err != nil || session_id.Value == "" {
-		http.Redirect(w, r, "/login", http.StatusFound)
-		return
-	}
-	log.Println(session_id.Value)
-	var user_id int
-	var expires_at time.Time
-	now := time.Now()
+	if err == nil && session_id.Value != "" {
+		log.Println(session_id.Value)
+		var user_id int
+		var expires_at time.Time
+		now := time.Now()
 
-	err = a.db.QueryRow("SELECT user_id,expires_at from sessions where sessions.session_id = ?", session_id.Value).Scan(&user_id, &expires_at)
-	if err != nil {
-		return
-	}
-	if expires_at.Before(now) {
-		_, err = a.db.Exec("DELETE from sessions where sessions.id=?", session_id.Value)
-	} else {
-		http.Redirect(w, r, "/", http.StatusFound)
+		err = a.db.QueryRow("SELECT user_id,expires_at from sessions where sessions.session_id = ?", session_id.Value).Scan(&user_id, &expires_at)
+		if err == nil {
+
+			if expires_at.Before(now) {
+				_, err = a.db.Exec("DELETE from sessions where sessions.id=?", session_id.Value)
+			} else {
+				http.Redirect(w, r, "/", http.StatusFound)
+			}
+
+		}
 	}
 
 	if r.Method == http.MethodGet {
