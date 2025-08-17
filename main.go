@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -51,16 +50,12 @@ type User struct {
 }
 
 func HashPasswordDeterministic(password, secret string) ([]byte, error) {
-	// 1. Deterministic hash (SHA256)
-	sum := sha256.Sum256([]byte(password + secret))
 
-	// 2. bcrypt hash the result
-	return bcrypt.GenerateFromPassword(sum[:], bcrypt.DefaultCost)
+	return bcrypt.GenerateFromPassword([]byte(password+secret), bcrypt.DefaultCost)
 }
 
 func CheckPasswordDeterministic(password, secret string, hashed []byte) error {
-	sum := sha256.Sum256([]byte(password + secret))
-	return bcrypt.CompareHashAndPassword(hashed, sum[:])
+	return bcrypt.CompareHashAndPassword(hashed, []byte(password+secret))
 }
 
 func (a *app) helloHandler(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +98,7 @@ func main() {
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
-	dsn := "root:@tcp(127.0.0.1:3306)/platform?multiStatements=true"
+	dsn := "root:@tcp(localhost:3306)/platform?multiStatements=true"
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %v", err)
