@@ -1,18 +1,20 @@
 package main
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"html/template"
-	"log"
-	"net/http"
-
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/mysql"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"golang.org/x/crypto/bcrypt"
+	"html/template"
+	"log"
+	"net/http"
+	"time"
 )
 
 type app struct {
@@ -20,6 +22,14 @@ type app struct {
 }
 
 var templates *template.Template
+
+func newSessionID() (string, error) {
+	b := make([]byte, 10)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
 
 func runMigrations(db *sql.DB) error {
 	driver, err := mysql.WithInstance(db, &mysql.Config{})
@@ -58,38 +68,49 @@ func CheckPasswordDeterministic(password, secret string, hashed []byte) error {
 	return bcrypt.CompareHashAndPassword(hashed, []byte(password+secret))
 }
 
-func (a *app) helloHandler(w http.ResponseWriter, r *http.Request) {
-	rows, err := a.db.Query("SELECT id, email, subscription_id FROM users")
+func (a *app) homePageHandler(w http.ResponseWriter, r *http.Request) {
+	session_id, err := r.Cookie("db_session_id")
+
+	if err != nil || session_id.Value == "" {
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	log.Println(session_id.Value)
+	var user_id int
+	var expires_at time.Time
+	now := time.Now()
+
+	err = a.db.QueryRow("SELECT user_id,expires_at from sessions where sessions.session_id = ?", session_id.Value).Scan(&user_id, &expires_at)
+	if err != nil {
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	if expires_at.Before(now) {
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+
+	// Valid session. Now get user info
+
+	var id int
+	var email string
+	var subscription_id *int
+	err = a.db.QueryRow("SELECT id, email, subscription_id FROM users WHERE users.id=?", user_id).Scan(&id, &email, &subscription_id)
 
 	if err != nil {
-		http.Error(w, "Failed to query users", http.StatusInternalServerError)
+		http.Error(w, "Failed to query user data", http.StatusInternalServerError)
 		log.Printf("DB query error: %v", err)
 		return
 	}
 
-	defer rows.Close()
-
-	var users []User
-
-	for rows.Next() {
-		var u User
-		err := rows.Scan(&u.ID, &u.Email, &u.SubscriptionID)
-		if err != nil {
-			http.Error(w, "Failed to scan user", http.StatusInternalServerError)
-			log.Printf("DB scan error: %v", err)
-			return
-		}
-		users = append(users, u)
-	}
-
-	if err := rows.Err(); err != nil {
-		http.Error(w, "Error iterating rows", http.StatusInternalServerError)
-		log.Printf("Rows error: %v", err)
-		return
+	user := User{
+		ID:             id,
+		Email:          email,
+		SubscriptionID: subscription_id,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(users)
+	json.NewEncoder(w).Encode(user)
 }
 
 func main() {
@@ -98,7 +119,7 @@ func main() {
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
-	dsn := "root:@tcp(localhost:3306)/platform?multiStatements=true"
+	dsn := "root:@tcp(localhost:3306)/platform?multiStatements=true&parseTime=true"
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %v", err)
@@ -116,7 +137,7 @@ func main() {
 	http.HandleFunc("/signup", a.signupHandler)
 	http.HandleFunc("/login", a.loginHandler)
 
-	http.HandleFunc("/", a.helloHandler)
+	http.HandleFunc("/", a.homePageHandler)
 	fmt.Println("Server listening on :8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("Server error: %v", err)
@@ -124,6 +145,26 @@ func main() {
 }
 
 func (a *app) signupHandler(w http.ResponseWriter, r *http.Request) {
+	session_id, err := r.Cookie("db_session_id")
+
+	if err != nil || session_id.Value == "" {
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	log.Println(session_id.Value)
+	var user_id int
+	var expires_at time.Time
+	now := time.Now()
+
+	err = a.db.QueryRow("SELECT user_id,expires_at from sessions where sessions.session_id = ?", session_id.Value).Scan(&user_id, &expires_at)
+	if err != nil {
+		return
+	}
+	if expires_at.Before(now) {
+		_, err = a.db.Exec("DELETE from sessions where sessions.id=?", session_id.Value)
+	} else {
+		http.Redirect(w, r, "/", http.StatusFound)
+	}
 	if r.Method == http.MethodGet {
 		err := templates.ExecuteTemplate(w, "signup.html", nil)
 		if err != nil {
@@ -137,8 +178,7 @@ func (a *app) signupHandler(w http.ResponseWriter, r *http.Request) {
 		pass := r.FormValue("password")
 		hashedPass, _ := HashPasswordDeterministic(pass, "dbms")
 
-		// Store into DB
-		_, err := a.db.Exec(
+		res, err := a.db.Exec(
 			"INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
 			name, email, hashedPass,
 		)
@@ -148,8 +188,33 @@ func (a *app) signupHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		user_id, err := res.LastInsertId()
+		sid, err := newSessionID()
+		if err != nil {
+			http.Error(w, "failed to create session", http.StatusInternalServerError)
+			return
+		}
+		exp := time.Now().Add(7 * 24 * time.Hour)
+		_, err = a.db.Exec("INSERT INTO sessions (session_id, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)", sid, user_id, exp, time.Now())
+		if err != nil {
+			http.Error(w, "failed to persist session", http.StatusInternalServerError)
+			log.Println(err)
+			return
+
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name:     "db_session_id",
+			Value:    sid,
+			Path:     "/",
+			Expires:  exp,
+			MaxAge:   int(time.Until(exp).Seconds()),
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+			Secure:   false,
+		})
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+
 		log.Printf("User signed up: name=%s email=%s", name, email)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 
@@ -157,6 +222,28 @@ func (a *app) signupHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) loginHandler(w http.ResponseWriter, r *http.Request) {
+
+	session_id, err := r.Cookie("db_session_id")
+
+	if err != nil || session_id.Value == "" {
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	log.Println(session_id.Value)
+	var user_id int
+	var expires_at time.Time
+	now := time.Now()
+
+	err = a.db.QueryRow("SELECT user_id,expires_at from sessions where sessions.session_id = ?", session_id.Value).Scan(&user_id, &expires_at)
+	if err != nil {
+		return
+	}
+	if expires_at.Before(now) {
+		_, err = a.db.Exec("DELETE from sessions where sessions.id=?", session_id.Value)
+	} else {
+		http.Redirect(w, r, "/", http.StatusFound)
+	}
+
 	if r.Method == http.MethodGet {
 		err := templates.ExecuteTemplate(w, "login.html", nil)
 		if err != nil {
@@ -183,6 +270,31 @@ func (a *app) loginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		} else {
 			log.Printf("success")
+			// create a session and save the id in cookie and send a set req
+			sid, err := newSessionID()
+			if err != nil {
+				http.Error(w, "failed to create session", http.StatusInternalServerError)
+				return
+			}
+			exp := time.Now().Add(7 * 24 * time.Hour)
+			_, err = a.db.Exec("INSERT INTO sessions (session_id, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)", sid, id, exp, time.Now())
+			if err != nil {
+				http.Error(w, "failed to persist session", http.StatusInternalServerError)
+				log.Println(err)
+				return
+
+			}
+			http.SetCookie(w, &http.Cookie{
+				Name:     "db_session_id",
+				Value:    sid,
+				Path:     "/",
+				Expires:  exp,
+				MaxAge:   int(time.Until(exp).Seconds()),
+				HttpOnly: true,
+				SameSite: http.SameSiteLaxMode,
+				Secure:   false,
+			})
+			http.Redirect(w, r, "/", http.StatusSeeOther)
 		}
 
 		http.Redirect(w, r, "/", http.StatusSeeOther)
