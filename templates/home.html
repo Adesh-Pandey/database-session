@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tinder Clone</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-pink-500 via-red-500 to-yellow-500 flex flex-col items-center justify-between">
+
+  <!-- Header -->
+  <header class="w-full flex justify-between items-center p-4 bg-white/10 backdrop-blur-lg border-b border-white/20">
+    <div class="flex items-center gap-2">
+      <img src="https://img.icons8.com/ios-filled/50/ffffff/fire-element.png" class="w-8 h-8" alt="Logo">
+      <span class="text-white font-bold text-xl">Tinder</span>
+    </div>
+    <nav class="flex gap-4 text-white font-semibold">
+      <a href="#" class="hover:text-yellow-200">Home</a>
+      <a href="/matches" class="hover:text-yellow-200">Matches</a>
+      <a href="#" class="hover:text-yellow-200">Profile</a>
+    </nav>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-grow flex items-center justify-center w-full p-4">
+    <div class="max-w-sm w-full flex flex-col items-center gap-6">
+
+      <!-- Loop over users dynamically -->
+      {{range .Users}}
+      <div class="bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6 flex flex-col items-center w-full">
+        <!-- Profile Card -->
+        <div class="relative w-72 h-96 rounded-xl overflow-hidden shadow-lg">
+          <img src="{{.ImgPath}}" alt="{{.Name}}" class="w-full h-full object-cover">
+          <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 via-black/20 to-transparent text-white">
+            <h2 class="text-2xl font-bold">{{.Name}}, {{.Age}}</h2>
+            <p class="text-sm text-gray-200">{{.Bio}}</p>
+            <p class="text-xs text-gray-400">Gender: {{.Gender}}</p>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex justify-between w-full mt-6">
+          <button onclick="swipe('{{.ID}}', false)" class="w-14 h-14 rounded-full bg-red-500 flex items-center justify-center shadow-lg hover:scale-110 transition">
+            <img src="https://img.icons8.com/ios-filled/50/ffffff/delete-sign.png" class="w-6 h-6" alt="Dislike">
+          </button>
+          <button onclick="swipe('{{.ID}}', true)" class="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center shadow-lg hover:scale-110 transition">
+            <img src="https://img.icons8.com/ios-filled/50/ffffff/like.png" class="w-8 h-8" alt="Like">
+          </button>
+        </div>
+      </div>
+      {{end}}
+
+    </div>
+  </main>
+
+  <!-- Bottom Navigation -->
+  <footer class="w-full flex justify-around items-center py-4 bg-white/10 backdrop-blur-lg border-t border-white/20 text-white">
+    <button class="hover:text-yellow-200">🔥 Discover</button>
+    <button class="hover:text-yellow-200">❤️ Likes</button>
+    <button class="hover:text-yellow-200">💬 Chats</button>
+    <button class="hover:text-yellow-200">👤 Profile</button>
+  </footer>
+
+  <!-- Optional JS -->
+  <script>
+    async function swipe(userId, isLike) {
+      try {
+        const res = await fetch('/swipe', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ 
+          swiped_id: Number(userId), // ensure integer
+        is_like: Boolean(isLike)  })
+        });
+        if (res.ok) {
+          // remove the user card from view
+          location.reload();
+        } else {
+          console.log(res)
+          alert("Swipe failed!");
+        }
+      } catch(err) {
+        console.error(err);
+        alert("Error swiping user.");
+      }
+    }
+  </script>
+
+</body>
+</html>
