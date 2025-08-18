@@ -1,0 +1,2 @@
+ALTER TABLE users 
+  ADD COLUMN insta_url VARCHAR(255) NOT NULL;
