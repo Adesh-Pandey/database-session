@@ -34,6 +34,11 @@ type TempSignupData struct {
 	Email    string
 	Password string
 }
+type SwipeResponse struct {
+    IsMatch bool   `json:"isMatch"`
+    Name    string `json:"name"`
+    ImgPath string `json:"imgPath"`
+}
 
 // In-memory store for temporary signup data (use Redis in production)
 var tempSignupStore = make(map[string]TempSignupData)
@@ -100,6 +105,7 @@ type MatchCard struct {
 type MatchesPageData struct {
 	CurrentUser UserCard
 	Matches     []MatchCard
+	Flash       string
 }
 
 func HashPasswordDeterministic(password, secret string) ([]byte, error) {
@@ -116,7 +122,7 @@ func (a *app) matchesHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusFound)
 		return
 	}
-
+	
 	// Get current user ID
 	var currentUserID int
 	err = a.db.QueryRow("SELECT user_id FROM sessions WHERE session_id = ?", sessionID.Value).Scan(&currentUserID)
@@ -156,10 +162,14 @@ func (a *app) matchesHandler(w http.ResponseWriter, r *http.Request) {
 		matches = append(matches, m)
 	}
 
-	data := MatchesPageData{
-		CurrentUser: currentUser,
-		Matches:     matches,
-	}
+	// <<< HERE: Grab flash message from URL >>>
+    flash := r.URL.Query().Get("flash")
+
+    data := MatchesPageData{
+        CurrentUser: currentUser,
+        Matches:     matches,
+        Flash:       flash, // pass flash to template
+    }
 
 	err = templates.ExecuteTemplate(w, "matches.html", data)
 	if err != nil {
@@ -168,7 +178,6 @@ func (a *app) matchesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) swipeHandler(w http.ResponseWriter, r *http.Request) {
-
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -189,44 +198,53 @@ func (a *app) swipeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req SwipeRequest
-	decode_err := json.NewDecoder(r.Body).Decode(&req)
-	if decode_err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
+	// Save the swipe
 	_, err = a.db.Exec(
 		"INSERT INTO swipes (swiper_id, swiped_id, is_like) VALUES (?, ?, ?)",
 		currentUserID, req.SwipedID, req.IsLike,
 	)
-
 	if err != nil {
 		http.Error(w, "Failed to save swipe", http.StatusInternalServerError)
 		return
 	}
 
-	if req.IsLike {
-		var count int
-		err = a.db.QueryRow(
-			"SELECT COUNT(*) FROM swipes WHERE swiper_id = ? AND swiped_id = ? AND is_like = true",
-			req.SwipedID, currentUserID,
-		).Scan(&count)
-		if err == nil && count > 0 {
-			// Create a match
-			_, err = a.db.Exec(
-				"INSERT IGNORE INTO matches (user_id, matched_user_id) VALUES (?, ?), (?, ?)",
-				currentUserID, req.SwipedID, req.SwipedID, currentUserID,
-			)
-			if err != nil {
-				log.Println("Failed to insert match:", err)
-			}
-		}
+	// Default response
+	resp := map[string]interface{}{
+		"isMatch": false,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	if req.IsLike {
+    var count int
+    err = a.db.QueryRow(
+        "SELECT COUNT(*) FROM swipes WHERE swiper_id = ? AND swiped_id = ? AND is_like = true",
+        req.SwipedID, currentUserID,
+    ).Scan(&count)
+    if err == nil && count > 0 {
+        // Create a match
+        _, err = a.db.Exec(
+            "INSERT IGNORE INTO matches (user_id, matched_user_id) VALUES (?, ?), (?, ?)",
+            currentUserID, req.SwipedID, req.SwipedID, currentUserID,
+        )
+        if err != nil {
+            log.Println("Failed to insert match:", err)
+        }
 
+        // Redirect with flash message
+        http.Redirect(w, r, "/matches?flash=Congrats!+You+have+a+new+match", http.StatusFound)
+        return
+    }
 }
+
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
 func (a *app) homePageHandler(w http.ResponseWriter, r *http.Request) {
 	sessionID, err := r.Cookie("db_session_id")
 	if err != nil || sessionID.Value == "" {
@@ -559,15 +577,40 @@ func (a *app) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+func (a *app)logoutHandler(w http.ResponseWriter, r *http.Request) {
+    if r.Method != http.MethodPost {
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
 
+    // Clear the session cookie
+    cookie := &http.Cookie{
+        Name:     "db_session_id", // must match the login cookie name
+        Value:    "",
+        Path:     "/",              // same as login
+        MaxAge:   -1,               // delete cookie
+        HttpOnly: true,
+        Secure:   false,            // true if using HTTPS
+        SameSite: http.SameSiteLaxMode,
+    }
+    http.SetCookie(w, cookie)
+
+    // Optionally: remove session from server-side store if used
+    // delete(sessionStore, sid)
+
+    // Redirect to login page
+    http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
 func main() {
 	templates = template.Must(template.ParseGlob("templates/*.html"))
+	// Serve all files in the "img" folder at URL path /img/
+	http.Handle("/img/", http.StripPrefix("/img/", http.FileServer(http.Dir("img"))))
 
 	// Serve static files and uploads
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
-	dsn := "root:@tcp(localhost:3306)/platform?multiStatements=true&parseTime=true"
+	dsn := "root:@Bishesh1228@tcp(localhost:3306)/platform?multiStatements=true&parseTime=true"
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %v", err)
@@ -588,8 +631,8 @@ func main() {
 	http.HandleFunc("/login", a.loginHandler)
 	http.HandleFunc("/", a.homePageHandler)
 	http.HandleFunc("/swipe", a.swipeHandler)
-	http.HandleFunc("/matches", a.matchesHandler)
-
+	http.HandleFunc("/matches", a.matchesHandler) 
+    http.HandleFunc("/logout", a.logoutHandler) 
 	fmt.Println("Server listening on :8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("Server error: %v", err)

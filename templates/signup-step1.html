@@ -3,28 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sign Up — MyApp</title>
+  <title>Sign Up — Soulmates</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-  <div class="max-w-4xl w-full grid md:grid-cols-2 bg-white/5 backdrop-blur-xl rounded-2xl shadow-lg border border-white/10 overflow-hidden">
-    
+<body class="min-h-screen bg-gradient-to-br from-purple-900 via-violet-800 to-purple-900 flex items-center justify-center p-4 font-sans">
+
+  <div class="max-w-4xl w-full grid md:grid-cols-2 bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+
     <!-- Left side -->
-    <div class="p-10 flex flex-col justify-center text-white">
-      <div class="flex items-center gap-3 mb-6">
-        <div class="w-12 h-12 rounded-lg bg-gradient-to-tr from-emerald-400 to-blue-400 flex items-center justify-center font-bold text-slate-900">MA</div>
+    <div class="p-10 flex flex-col justify-center text-white relative">
+      <!-- Background gradient overlay -->
+      <div class="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-violet-500/20 pointer-events-none"></div>
+
+      <!-- Logo & App Name -->
+      <div class="flex items-center gap-3 mb-6 relative z-10">
+        <img src="img/png.png" alt="Soulmates Logo" class="w-12 h-12 rounded-xl shadow-md object-cover">
         <div>
-          <p class="font-bold text-lg">MyApp</p>
-          <p class="text-xs text-gray-400">Smart tools for creators</p>
+          <p class="font-bold text-lg">Soulmates</p>
+          <p class="text-xs text-violet-300">Smart tools for creators</p>
         </div>
       </div>
-      <h1 class="text-3xl font-bold mb-4">Create your account</h1>
-      <p class="text-gray-400">Join MyApp — build, share, and grow. Your account gives you access to dashboards, project settings, and API keys.</p>
-      
+
+      <!-- Welcome heading -->
+      <h1 class="text-4xl font-extrabold mb-4 relative z-10">Create your account</h1>
+      <p class="text-violet-200 relative z-10 mb-6">
+        Join Soulmates — build, share, and grow. Your account gives you access to dashboards, project settings, and API keys.
+      </p>
+
       <!-- Progress indicator -->
-      <div class="mt-8">
+      <div class="mt-8 relative z-10">
         <div class="flex items-center">
-          <div class="w-8 h-8 rounded-full bg-gradient-to-r from-emerald-400 to-blue-400 flex items-center justify-center text-slate-900 font-semibold">1</div>
+          <div class="w-8 h-8 rounded-full bg-gradient-to-r from-purple-400 to-violet-500 flex items-center justify-center text-slate-900 font-semibold">1</div>
           <div class="flex-1 h-1 bg-gray-600 mx-2"></div>
           <div class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-gray-400 font-semibold">2</div>
         </div>
@@ -33,49 +42,54 @@
           <span>Profile Setup</span>
         </div>
       </div>
-      
-      <p class="mt-auto text-xs text-gray-500 pt-6">By signing up you agree to our 
-        <a href="#" class="text-blue-400 hover:underline">Terms</a> and 
-        <a href="#" class="text-blue-400 hover:underline">Privacy Policy</a>.
+
+      <p class="mt-auto text-xs text-gray-400 pt-6 relative z-10">
+        By signing up you agree to our 
+        <a href="#" class="text-purple-300 hover:underline">Terms</a> and 
+        <a href="#" class="text-purple-300 hover:underline">Privacy Policy</a>.
       </p>
     </div>
-    
-    <!-- Right side -->
-    <div class="p-8 bg-white/10 flex items-center justify-center">
-      <form method="POST" action="/signup" class="w-full max-w-sm space-y-4">
-        
-        <h2 class="text-xl font-semibold text-white">Sign up</h2>
-        <p class="text-sm text-gray-400">Already have an account? <a href="/login" class="text-blue-400 hover:underline">Sign in</a></p>
+
+    <!-- Right side (Signup Form) -->
+    <div class="p-8 bg-white/5 flex items-center justify-center">
+      <form method="POST" action="/signup" class="w-full max-w-sm space-y-5">
+        <h2 class="text-2xl font-bold text-white">Sign up</h2>
+
+        <!-- Already have an account link -->
+        <p class="text-sm text-violet-300">
+          Already have an account? 
+          <a href="/login" class="text-purple-400 hover:underline font-semibold">Sign in</a>
+        </p>
 
         <div>
-          <label for="name" class="block text-sm font-medium text-gray-300 mb-1">Full name</label>
-          <input type="text" id="name" name="name" required class="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400" placeholder="John Doe">
+          <label for="name" class="block text-sm font-medium text-violet-200 mb-1">Full name</label>
+          <input type="text" id="name" name="name" required 
+            class="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-violet-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition" 
+            placeholder="John Doe">
         </div>
 
         <div>
-          <label for="email" class="block text-sm font-medium text-gray-300 mb-1">Email</label>
-          <input type="email" id="email" name="email" required class="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400" placeholder="you@example.com">
+          <label for="email" class="block text-sm font-medium text-violet-200 mb-1">Email</label>
+          <input type="email" id="email" name="email" required 
+            class="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-violet-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition" 
+            placeholder="you@example.com">
         </div>
 
         <div>
-          <label for="password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
-          <input type="password" id="password" name="password" required class="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400" placeholder="••••••••">
+          <label for="password" class="block text-sm font-medium text-violet-200 mb-1">Password</label>
+          <input type="password" id="password" name="password" required 
+            class="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-violet-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition" 
+            placeholder="••••••••">
         </div>
 
-        <button type="submit" class="w-full py-2 rounded-lg bg-gradient-to-r from-emerald-400 to-blue-400 font-semibold text-slate-900 hover:opacity-90 transition">Continue to Profile Setup</button>
-        
-        <div class="flex items-center my-4">
-          <hr class="flex-grow border-gray-700">
-          <span class="mx-2 text-gray-400 text-sm">or</span>
-          <hr class="flex-grow border-gray-700">
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <button type="button" class="py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10">Google</button>
-          <button type="button" class="py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10">GitHub</button>
-        </div>
+        <button type="submit" 
+          class="w-full py-2 rounded-lg bg-gradient-to-r from-purple-400 to-violet-500 font-semibold text-slate-900 hover:opacity-90 transition shadow-lg">
+          Continue to Profile Setup
+        </button>
       </form>
     </div>
+
   </div>
+
 </body>
 </html>

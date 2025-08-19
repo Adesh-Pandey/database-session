@@ -1,26 +1,57 @@
 {{define "matches.html"}}
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Matches - Tinder Clone</title>
+  <title>Matches - Soulmates</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 min-h-screen">
-  <div class="container mx-auto p-4">
-    <h1 class="text-2xl font-bold mb-4">Your Matches</h1>
+
+<body class="min-h-screen bg-gradient-to-br from-purple-700 via-violet-600 to-indigo-500 flex flex-col">
+
+  <!-- Header -->
+  <header class="w-full flex justify-between items-center p-4 bg-white/10 backdrop-blur-lg border-b border-white/20">
+    <div class="flex items-center gap-2">
+      <img src="img/png.png" class="w-16 h-16" alt="Logo">
+      <span class="text-white font-bold text-xl">Soulmates</span>
+    </div>
+    <nav>
+      <a href="/"
+        class="bg-gradient-to-r from-purple-500 via-violet-500 to-indigo-500 text-white px-4 py-2 rounded-full shadow-lg hover:scale-105 transition transform">
+        Home
+      </a>
+    </nav>
+  </header>
+  {{if .Flash}}
+  <div id="flashModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-80 flex flex-col items-center shadow-xl">
+      <h2 class="text-2xl font-bold mb-4 text-purple-700">🎉 New Match!</h2>
+      <p class="text-gray-700 font-semibold mb-4">{{.Flash}}</p>
+      <button onclick="document.getElementById('flashModal').remove()"
+        class="px-6 py-2 rounded-lg bg-purple-500 text-white hover:opacity-90 transition">
+        Close
+      </button>
+    </div>
+  </div>
+  {{end}}
+  <!-- Main Content -->
+  <main class="flex-grow container mx-auto p-6">
+    <h1 class="text-3xl font-bold text-white mb-6 text-center">Your Matches</h1>
 
     {{if .Matches}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
       {{range .Matches}}
-      <div class="bg-white rounded-lg shadow-md p-4 flex flex-col items-center">
-        <img src="{{.ImgPath}}" alt="{{.Name}}" class="w-32 h-32 rounded-full object-cover mb-2">
-        <h2 class="text-lg font-semibold">{{.Name}}, {{.Age}}</h2>
-        <p class="text-gray-600 text-center mb-2">{{.Bio}}</p>
-        <p class="text-gray-500 mb-2">{{.Gender}}</p>
+      <div
+        class="bg-white/10 backdrop-blur-xl rounded-2xl shadow-lg p-6 flex flex-col items-center hover:scale-105 transition transform">
+        <img src="{{.ImgPath}}" alt="{{.Name}}"
+          class="w-32 h-32 rounded-full object-cover mb-4 border-4 border-white/30 shadow-md">
+        <h2 class="text-xl font-semibold text-white">{{.Name}}, {{.Age}}</h2>
+        <p class="text-gray-200 text-center mb-2">{{.Bio}}</p>
+        <p class="text-gray-400 mb-3">{{.Gender}}</p>
         {{if .InstaURL}}
-        <a href="{{.InstaURL}}" target="_blank" class="text-blue-500 hover:underline">
+        <a href="{{.InstaURL}}" target="_blank" class="text-indigo-200 hover:underline mb-2">
           Instagram Profile
         </a>
         {{end}}
@@ -28,9 +59,16 @@
       {{end}}
     </div>
     {{else}}
-      <p class="text-gray-700">No matches yet. Keep swiping!</p>
+    <p class="text-white text-center mt-10 text-lg">No matches yet. Keep swiping!</p>
     {{end}}
-  </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="w-full py-4 bg-white/10 backdrop-blur-lg border-t border-white/20 text-white text-center">
+    <p>Made with ❤️ by Soulmates</p>
+  </footer>
+
 </body>
+
 </html>
 {{end}}
