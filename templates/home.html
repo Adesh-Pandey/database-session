@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tinder Clone</title>
+  <title>Tinder Clone - Soulmates</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-purple-700 via-violet-600 to-indigo-500 flex flex-col items-center justify-between">
+<body class="min-h-screen bg-gradient-to-br from-rose-500 via-fuchsia-500 to-violet-700 flex flex-col items-center justify-between">
 
   <!-- Header -->
   <header class="w-full flex justify-between items-center p-4 bg-white/10 backdrop-blur-lg border-b border-white/20">
@@ -14,10 +14,20 @@
       <img src="img/png.png" class="w-16 h-16" alt="Logo">
       <span class="text-white font-bold text-xl">Soulmates</span>
     </div>
-    <nav class="flex gap-4 text-white font-semibold items-center">
-      <a href="#" class="hover:text-indigo-200">Home</a>
-      <a href="/matches" class="hover:text-indigo-200">Matches</a>
-      
+    <nav class="flex gap-4 items-center font-semibold">
+      <!-- Home Button -->
+      <a href="/home" 
+         class="bg-gradient-to-r from-rose-400 via-fuchsia-500 to-violet-500 text-white px-4 py-2 rounded-full shadow-lg hover:scale-105 transition transform">
+        Home
+      </a>
+      <a href="/matches" 
+         class="bg-white/20 text-white px-4 py-2 rounded-full shadow hover:scale-105 transition transform">
+        Matches
+      </a>
+
+      <!-- Session Expiry Countdown -->
+      <span id="session-expiry" class="text-white/80 text-sm px-3 py-1 rounded-md bg-white/20"></span>
+
       <!-- Logout Button as form POST -->
       <form action="/logout" method="POST">
         <button type="submit" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold shadow-md transition">
@@ -33,14 +43,14 @@
 
       <!-- Loop over users dynamically -->
       {{range .Users}}
-      <div class="bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6 flex flex-col items-center w-full">
+      <div class="bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6 flex flex-col items-center w-full hover:scale-105 transition transform">
         <!-- Profile Card -->
         <div class="relative w-72 h-96 rounded-xl overflow-hidden shadow-lg">
           <img src="{{.ImgPath}}" alt="{{.Name}}" class="w-full h-full object-cover">
           <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 via-black/20 to-transparent text-white">
             <h2 class="text-2xl font-bold">{{.Name}}, {{.Age}}</h2>
-            <p class="text-sm text-gray-200">{{.Bio}}</p>
-            <p class="text-xs text-gray-400">Gender: {{.Gender}}</p>
+            <p class="text-white/70 text-sm">{{.Bio}}</p>
+            <p class="text-white/60 text-xs">Gender: {{.Gender}}</p>
           </div>
         </div>
 
@@ -81,6 +91,28 @@
         alert("Error swiping user.");
       }
     }
+
+    // Session expiry countdown
+    const expiry = Number("{{.SessionExpires}}") * 1000; // backend should pass Unix timestamp in seconds
+    const expiryEl = document.getElementById('session-expiry');
+
+    function updateCountdown() {
+      const now = Date.now();
+      const diff = expiry - now;
+      if (diff <= 0) {
+        expiryEl.textContent = "Session expired";
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+      expiryEl.textContent = `Session ends in ${hours}h ${mins}m ${secs}s`;
+    }
+
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
   </script>
 
 </body>

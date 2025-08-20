@@ -9,7 +9,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="min-h-screen bg-gradient-to-br from-purple-700 via-violet-600 to-indigo-500 flex flex-col">
+<body class="min-h-screen bg-gradient-to-br from-rose-500 via-fuchsia-500 to-violet-700 flex flex-col">
 
   <!-- Header -->
   <header class="w-full flex justify-between items-center p-4 bg-white/10 backdrop-blur-lg border-b border-white/20">
@@ -17,25 +17,28 @@
       <img src="img/png.png" class="w-16 h-16" alt="Logo">
       <span class="text-white font-bold text-xl">Soulmates</span>
     </div>
-    <nav>
-      <a href="/"
-        class="bg-gradient-to-r from-purple-500 via-violet-500 to-indigo-500 text-white px-4 py-2 rounded-full shadow-lg hover:scale-105 transition transform">
+    <nav class="flex gap-4">
+      <!-- Home Button -->
+      <a href="/home"
+        class="bg-gradient-to-r from-rose-400 via-fuchsia-500 to-violet-500 text-white px-4 py-2 rounded-full shadow-lg hover:scale-105 transition transform">
         Home
       </a>
     </nav>
   </header>
+
   {{if .Flash}}
   <div id="flashModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl p-6 w-80 flex flex-col items-center shadow-xl">
-      <h2 class="text-2xl font-bold mb-4 text-purple-700">🎉 New Match!</h2>
+      <h2 class="text-2xl font-bold mb-4 text-rose-500">🎉 New Match!</h2>
       <p class="text-gray-700 font-semibold mb-4">{{.Flash}}</p>
       <button onclick="document.getElementById('flashModal').remove()"
-        class="px-6 py-2 rounded-lg bg-purple-500 text-white hover:opacity-90 transition">
+        class="px-6 py-2 rounded-lg bg-rose-400 text-white hover:opacity-90 transition">
         Close
       </button>
     </div>
   </div>
   {{end}}
+
   <!-- Main Content -->
   <main class="flex-grow container mx-auto p-6">
     <h1 class="text-3xl font-bold text-white mb-6 text-center">Your Matches</h1>
@@ -48,10 +51,10 @@
         <img src="{{.ImgPath}}" alt="{{.Name}}"
           class="w-32 h-32 rounded-full object-cover mb-4 border-4 border-white/30 shadow-md">
         <h2 class="text-xl font-semibold text-white">{{.Name}}, {{.Age}}</h2>
-        <p class="text-gray-200 text-center mb-2">{{.Bio}}</p>
-        <p class="text-gray-400 mb-3">{{.Gender}}</p>
+        <p class="text-white/70 text-center mb-2">{{.Bio}}</p>
+        <p class="text-white/60 mb-3">{{.Gender}}</p>
         {{if .InstaURL}}
-        <a href="{{.InstaURL}}" target="_blank" class="text-indigo-200 hover:underline mb-2">
+        <a href="{{.InstaURL}}" target="_blank" class="text-fuchsia-200 hover:underline mb-2">
           Instagram Profile
         </a>
         {{end}}

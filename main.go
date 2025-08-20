@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4"
@@ -85,6 +86,7 @@ type UserCard struct {
 type TinderPageData struct {
 	CurrentUser UserCard
 	Users       []UserCard
+	SessionExpires int64
 }
 
 type SwipeRequest struct {
@@ -251,9 +253,11 @@ func (a *app) homePageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. Get current user ID
+	// 1. Get current user ID + session expiry
 	var currentUserID int
-	err = a.db.QueryRow("SELECT user_id FROM sessions WHERE session_id = ?", sessionID.Value).Scan(&currentUserID)
+	var expiresAt time.Time
+	err = a.db.QueryRow("SELECT user_id, expires_at FROM sessions WHERE session_id = ?", sessionID.Value).
+		Scan(&currentUserID, &expiresAt)
 	if err != nil {
 		http.Redirect(w, r, "/login", http.StatusFound)
 		return
@@ -268,13 +272,42 @@ func (a *app) homePageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. Get all other users who are not already swiped by current user
-	rows, err := a.db.Query(`
-        SELECT id, name, age, bio, gender, img_path 
-        FROM users 
-        WHERE id != ? AND id NOT IN (
-            SELECT swiped_id FROM swipes WHERE swiper_id = ?
-        )`, currentUserID, currentUserID)
+	// 3. Determine opposite gender
+	var targetGender string
+	switch strings.ToLower(currentUser.Gender) {
+	case "male":
+		targetGender = "female"
+	case "female":
+		targetGender = "male"
+	default:
+		// For non-binary or other genders, show all genders except their own
+		targetGender = ""
+	}
+
+	// 4. Get all other users of opposite gender who are not already swiped by current user
+	var rows *sql.Rows
+	if targetGender != "" {
+		// Query for specific opposite gender
+		rows, err = a.db.Query(`
+			SELECT id, name, age, bio, gender, img_path 
+			FROM users 
+			WHERE id != ? 
+			AND LOWER(gender) = LOWER(?) 
+			AND id NOT IN (
+				SELECT swiped_id FROM swipes WHERE swiper_id = ?
+			)`, currentUserID, targetGender, currentUserID)
+	} else {
+		// For non-binary users, show all genders except their own
+		rows, err = a.db.Query(`
+			SELECT id, name, age, bio, gender, img_path 
+			FROM users 
+			WHERE id != ? 
+			AND LOWER(gender) != LOWER(?) 
+			AND id NOT IN (
+				SELECT swiped_id FROM swipes WHERE swiper_id = ?
+			)`, currentUserID, currentUser.Gender, currentUserID)
+	}
+
 	if err != nil {
 		http.Error(w, "Failed to load other users", http.StatusInternalServerError)
 		return
@@ -291,10 +324,11 @@ func (a *app) homePageHandler(w http.ResponseWriter, r *http.Request) {
 		users = append(users, u)
 	}
 
-	// 4. Pass data to template
+	// 5. Pass data to template
 	data := TinderPageData{
-		CurrentUser: currentUser,
-		Users:       users,
+		CurrentUser:    currentUser,
+		Users:          users,
+		SessionExpires: expiresAt.Unix(), // Unix timestamp (seconds)
 	}
 
 	err = templates.ExecuteTemplate(w, "home.html", data)
@@ -467,7 +501,7 @@ func (a *app) signupStep2Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		exp := time.Now().Add(7 * 24 * time.Hour)
+		exp := time.Now().Add(5 * time.Minute)
 		_, err = a.db.Exec("INSERT INTO sessions (session_id, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
 			sid, userID, exp, time.Now())
 		if err != nil {
@@ -609,7 +643,7 @@ func main() {
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
-	dsn := "root:@tcp(localhost:3306)/platform?multiStatements=true&parseTime=true"
+	dsn := "root:@Bishesh1228@tcp(localhost:3306)/platform?multiStatements=true&parseTime=true"
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %v", err)
