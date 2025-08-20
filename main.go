@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4"
@@ -33,6 +34,11 @@ type TempSignupData struct {
 	Name     string
 	Email    string
 	Password string
+}
+type SwipeResponse struct {
+	IsMatch bool   `json:"isMatch"`
+	Name    string `json:"name"`
+	ImgPath string `json:"imgPath"`
 }
 
 // In-memory store for temporary signup data (use Redis in production)
@@ -80,6 +86,7 @@ type UserCard struct {
 type TinderPageData struct {
 	CurrentUser UserCard
 	Users       []UserCard
+	SessionExpires int64
 }
 
 type SwipeRequest struct {
@@ -100,6 +107,7 @@ type MatchCard struct {
 type MatchesPageData struct {
 	CurrentUser UserCard
 	Matches     []MatchCard
+	Flash       string
 }
 
 func HashPasswordDeterministic(password, secret string) ([]byte, error) {
@@ -156,9 +164,13 @@ func (a *app) matchesHandler(w http.ResponseWriter, r *http.Request) {
 		matches = append(matches, m)
 	}
 
+	// <<< HERE: Grab flash message from URL >>>
+	flash := r.URL.Query().Get("flash")
+
 	data := MatchesPageData{
 		CurrentUser: currentUser,
 		Matches:     matches,
+		Flash:       flash, // pass flash to template
 	}
 
 	err = templates.ExecuteTemplate(w, "matches.html", data)
@@ -168,7 +180,6 @@ func (a *app) matchesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) swipeHandler(w http.ResponseWriter, r *http.Request) {
-
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -189,20 +200,24 @@ func (a *app) swipeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req SwipeRequest
-	decode_err := json.NewDecoder(r.Body).Decode(&req)
-	if decode_err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
+	// Save the swipe
 	_, err = a.db.Exec(
 		"INSERT INTO swipes (swiper_id, swiped_id, is_like) VALUES (?, ?, ?)",
 		currentUserID, req.SwipedID, req.IsLike,
 	)
-
 	if err != nil {
 		http.Error(w, "Failed to save swipe", http.StatusInternalServerError)
 		return
+	}
+
+	// Default response
+	resp := map[string]interface{}{
+		"isMatch": false,
 	}
 
 	if req.IsLike {
@@ -220,13 +235,17 @@ func (a *app) swipeHandler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				log.Println("Failed to insert match:", err)
 			}
+
+			// Redirect with flash message
+			http.Redirect(w, r, "/matches?flash=Congrats!+You+have+a+new+match", http.StatusFound)
+			return
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-
+	json.NewEncoder(w).Encode(resp)
 }
+
 func (a *app) homePageHandler(w http.ResponseWriter, r *http.Request) {
 	sessionID, err := r.Cookie("db_session_id")
 	if err != nil || sessionID.Value == "" {
@@ -234,9 +253,11 @@ func (a *app) homePageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. Get current user ID
+	// 1. Get current user ID + session expiry
 	var currentUserID int
-	err = a.db.QueryRow("SELECT user_id FROM sessions WHERE session_id = ?", sessionID.Value).Scan(&currentUserID)
+	var expiresAt time.Time
+	err = a.db.QueryRow("SELECT user_id, expires_at FROM sessions WHERE session_id = ?", sessionID.Value).
+		Scan(&currentUserID, &expiresAt)
 	if err != nil {
 		http.Redirect(w, r, "/login", http.StatusFound)
 		return
@@ -251,13 +272,42 @@ func (a *app) homePageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. Get all other users who are not already swiped by current user
-	rows, err := a.db.Query(`
-        SELECT id, name, age, bio, gender, img_path 
-        FROM users 
-        WHERE id != ? AND id NOT IN (
-            SELECT swiped_id FROM swipes WHERE swiper_id = ?
-        )`, currentUserID, currentUserID)
+	// 3. Determine opposite gender
+	var targetGender string
+	switch strings.ToLower(currentUser.Gender) {
+	case "male":
+		targetGender = "female"
+	case "female":
+		targetGender = "male"
+	default:
+		// For non-binary or other genders, show all genders except their own
+		targetGender = ""
+	}
+
+	// 4. Get all other users of opposite gender who are not already swiped by current user
+	var rows *sql.Rows
+	if targetGender != "" {
+		// Query for specific opposite gender
+		rows, err = a.db.Query(`
+			SELECT id, name, age, bio, gender, img_path 
+			FROM users 
+			WHERE id != ? 
+			AND LOWER(gender) = LOWER(?) 
+			AND id NOT IN (
+				SELECT swiped_id FROM swipes WHERE swiper_id = ?
+			)`, currentUserID, targetGender, currentUserID)
+	} else {
+		// For non-binary users, show all genders except their own
+		rows, err = a.db.Query(`
+			SELECT id, name, age, bio, gender, img_path 
+			FROM users 
+			WHERE id != ? 
+			AND LOWER(gender) != LOWER(?) 
+			AND id NOT IN (
+				SELECT swiped_id FROM swipes WHERE swiper_id = ?
+			)`, currentUserID, currentUser.Gender, currentUserID)
+	}
+
 	if err != nil {
 		http.Error(w, "Failed to load other users", http.StatusInternalServerError)
 		return
@@ -274,10 +324,11 @@ func (a *app) homePageHandler(w http.ResponseWriter, r *http.Request) {
 		users = append(users, u)
 	}
 
-	// 4. Pass data to template
+	// 5. Pass data to template
 	data := TinderPageData{
-		CurrentUser: currentUser,
-		Users:       users,
+		CurrentUser:    currentUser,
+		Users:          users,
+		SessionExpires: expiresAt.Unix(), // Unix timestamp (seconds)
 	}
 
 	err = templates.ExecuteTemplate(w, "home.html", data)
@@ -450,7 +501,7 @@ func (a *app) signupStep2Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		exp := time.Now().Add(7 * 24 * time.Hour)
+		exp := time.Now().Add(5 * time.Minute)
 		_, err = a.db.Exec("INSERT INTO sessions (session_id, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
 			sid, userID, exp, time.Now())
 		if err != nil {
@@ -559,15 +610,40 @@ func (a *app) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+func (a *app) logoutHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
+	// Clear the session cookie
+	cookie := &http.Cookie{
+		Name:     "db_session_id", // must match the login cookie name
+		Value:    "",
+		Path:     "/", // same as login
+		MaxAge:   -1,  // delete cookie
+		HttpOnly: true,
+		Secure:   false, // true if using HTTPS
+		SameSite: http.SameSiteLaxMode,
+	}
+	http.SetCookie(w, cookie)
+
+	// Optionally: remove session from server-side store if used
+	// delete(sessionStore, sid)
+
+	// Redirect to login page
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
 func main() {
 	templates = template.Must(template.ParseGlob("templates/*.html"))
+	// Serve all files in the "img" folder at URL path /img/
+	http.Handle("/img/", http.StripPrefix("/img/", http.FileServer(http.Dir("img"))))
 
 	// Serve static files and uploads
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
-	dsn := "root:@tcp(localhost:3306)/platform?multiStatements=true&parseTime=true"
+	dsn := "root:@Bishesh1228@tcp(localhost:3306)/platform?multiStatements=true&parseTime=true"
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %v", err)
@@ -589,7 +665,7 @@ func main() {
 	http.HandleFunc("/", a.homePageHandler)
 	http.HandleFunc("/swipe", a.swipeHandler)
 	http.HandleFunc("/matches", a.matchesHandler)
-
+	http.HandleFunc("/logout", a.logoutHandler)
 	fmt.Println("Server listening on :8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("Server error: %v", err)
